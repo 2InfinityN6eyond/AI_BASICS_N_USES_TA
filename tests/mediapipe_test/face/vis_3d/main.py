@@ -1,51 +1,115 @@
 import sys
 import sys
 import numpy as np
-import threading
+import cv2
 import multiprocessing
+from multiprocessing import shared_memory
+import argparse
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
 
-from face_reader import FaceReader
-from visualize_3d_pose import MediaPipeVisualizer
+from camera_reader import CameraReader
+from face_landmark_processor import FaceLandmarkProcessor
+from mediapipe_visualizer import ThreeDimensionVisualizer
+from main_window import MainWindow
 
 class DataBridge(QtCore.QThread) :
     landmark_acquired = QtCore.pyqtSignal(dict)
 
-    def __init__(self, stop_flag, from_holistic_reader) :
+    def __init__(self, stop_flag, data_queue) :
         super(DataBridge, self).__init__()
         self.stop_flag = stop_flag
-        self.from_holistic_reader = from_holistic_reader
+        self.data_queue = data_queue
 
     def run(self) :
         while not self.stop_flag.is_set() :
             self.landmark_acquired.emit(
-                self.from_holistic_reader.get()
+                self.data_queue.get()
             )
 
-
 if __name__ == "__main__" :
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--camera_idx",       default=0, type=int)
+    parser.add_argument("--image_queue_size", default=4, type=int)
+    parser.add_argument("--image_width",      default=1552, type=int)
+    parser.add_argument("--image_height",     default=1552, type=int)
+    args = parser.parse_args()
+    camera_idx = args.camera_idx
+
+    # open webcam first and get image size.
+    # image shape should be square
+    cap = cv2.VideoCapture(args.camera_idx)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH,  args.image_width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.image_height)
+    frame_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    cap.release()
+    print("webcam image size set to {}X{}".format(
+        frame_width, frame_height
+    ))
+
+    # initialize shared memory for storing camera frames
+    shm = shared_memory.SharedMemory(
+        create = True,
+        size   = args.image_queue_size * frame_width * frame_height * 3 
+    )
+    shm_name = shm.name
+
+    # initialize pyqt app
     app = QtWidgets.QApplication(sys.argv)
+    #plot_widget = ThreeDimensionVisualizer()
+    #plot_widget.show()
+    main_window = MainWindow()
 
-    landmark_queue = multiprocessing.Queue()
-    holistic_reader = FaceReader(landmark_queue)
+    # flag for stop program. chile processes stop if stop_flag set.
+    stop_flag = multiprocessing.Event()
+    # queue accross processes for sending index where image is stored in shm
+    img_idx_queue = multiprocessing.Queue()
+    # queue accross processes for sending face mesh data
+    data_queue = multiprocessing.Queue()
 
-    thread_stop_flag = threading.Event()
-    data_bridge = DataBridge(thread_stop_flag, landmark_queue)
-
-    plot_widget = MediaPipeVisualizer()
-    plot_widget.show()
+    camera_reader = CameraReader(
+        camera_idx      = camera_idx,
+        frame_width     = frame_width,
+        frame_height    = frame_height,
+        shm_name        = shm_name,
+        img_queue_size  = args.image_queue_size,
+        img_idx_queue   = img_idx_queue,
+        stop_flag       = stop_flag,
+    )
+    face_landmark_processor = FaceLandmarkProcessor(
+        frame_width     = frame_width,
+        frame_height    = frame_height,
+        shm_name        = shm_name,
+        img_queue_size  = args.image_queue_size,
+        img_idx_queue   = img_idx_queue,
+        data_queue      = data_queue,
+        stop_flag       = stop_flag,
+    )
+    data_bridge = DataBridge(
+        stop_flag = stop_flag,
+        data_queue = data_queue
+    )
+    #data_bridge.landmark_acquired.connect(
+    #    lambda landmark_dict : plot_widget.updateWhole(landmark_dict)
+    #)
 
     data_bridge.landmark_acquired.connect(
-        lambda landmark_dict : plot_widget.updateWhole(landmark_dict)
+        lambda landmark_dict : main_window.three_dimention_visualizer.updateWhole(landmark_dict)
     )
 
-    holistic_reader.start()
     data_bridge.start()
+    face_landmark_processor.start()
+    camera_reader.start()
 
     app.exec()
 
-    thread_stop_flag.set()
+    stop_flag.set()
+    camera_reader.join()
+    face_landmark_processor.join()
+
+    shm.close()
+    shm.unlink()
     sys.exit()
