@@ -114,8 +114,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.three_dimention_visualizer.updateWhole(face_landmark_dict)
         image_queue_idx = face_landmark_dict["image_idx"]
         face_landmarks_array  = face_landmark_dict["face"]
+
         image = self.image_queue[image_queue_idx]
-        vis_image = image.copy()
+        image = image.copy()
+
+        if face_landmarks_array is None : 
+            return
 
         full_lt_rb = np.array([
             face_landmarks_array.min(axis=0),
@@ -146,7 +150,8 @@ class MainWindow(QtWidgets.QMainWindow):
         right_eye_lt_rb = right_eye_lt_rb.flatten().astype(int)
 
 
-        self.webcam_image_plotter.update(image)
+        print(image.shape)
+        #self.webcam_image_plotter.update(image)
         '''
         self.face_plotter.update(image[
             full_lt_rb[1]:full_lt_rb[3], full_lt_rb[0]:full_lt_rb[2], :
