@@ -31,7 +31,7 @@ class CameraReader(multiprocessing.Process) :
             (self.img_queue_size, self.frame_height, self.frame_width, 3),
             dtype=np.uint8, buffer = shm.buf
         )
-        cap = cv2.VideoCapture(self.camera_idx)
+        cap = cv2.VideoCapture(self.camera_idx, cv2.CAP_DSHOW)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
 

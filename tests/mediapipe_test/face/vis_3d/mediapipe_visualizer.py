@@ -109,10 +109,11 @@ class TwoDimensionVisualizer() :
     def __init__(self) :
         pass
 
-    def visualizeFace(
+    def visualizeFace2D(
         image,
         landmark_array
     ) :
+        
         pass
 
 class ThreeDimensionVisualizer(gl.GLViewWidget) :

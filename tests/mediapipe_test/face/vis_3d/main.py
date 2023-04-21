@@ -32,7 +32,7 @@ class DataBridge(QtCore.QThread) :
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
     parser.add_argument("--camera_idx",       default=0, type=int)
-    parser.add_argument("--image_queue_size", default=4, type=int)
+    parser.add_argument("--image_queue_size", default=5, type=int)
     parser.add_argument("--image_width",      default=1552, type=int)
     parser.add_argument("--image_height",     default=1552, type=int)
     args = parser.parse_args()
@@ -40,7 +40,7 @@ if __name__ == "__main__" :
 
     # open webcam first and get image size.
     # image shape should be square
-    cap = cv2.VideoCapture(args.camera_idx)
+    cap = cv2.VideoCapture(args.camera_idx, cv2.CAP_DSHOW)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  args.image_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.image_height)
     frame_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -59,9 +59,13 @@ if __name__ == "__main__" :
 
     # initialize pyqt app
     app = QtWidgets.QApplication(sys.argv)
-    #plot_widget = ThreeDimensionVisualizer()
-    #plot_widget.show()
-    main_window = MainWindow()
+    main_window = MainWindow(
+        frame_width     = frame_width,
+        frame_height    = frame_height,
+        shm_name        = shm_name,
+        img_queue_size  = args.image_queue_size,
+    )
+
 
     # flag for stop program. chile processes stop if stop_flag set.
     stop_flag = multiprocessing.Event()
@@ -92,12 +96,10 @@ if __name__ == "__main__" :
         stop_flag = stop_flag,
         data_queue = data_queue
     )
-    #data_bridge.landmark_acquired.connect(
-    #    lambda landmark_dict : plot_widget.updateWhole(landmark_dict)
-    #)
-
+    
     data_bridge.landmark_acquired.connect(
-        lambda landmark_dict : main_window.three_dimention_visualizer.updateWhole(landmark_dict)
+        #lambda landmark_dict : main_window.three_dimention_visualizer.updateWhole(landmark_dict)
+        lambda ladmark_dict : main_window.updateWhole(ladmark_dict)
     )
 
     data_bridge.start()

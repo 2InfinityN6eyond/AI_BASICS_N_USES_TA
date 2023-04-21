@@ -23,6 +23,8 @@ class ImagePlotter(QtWidgets.QLabel) :
         q_image = QtGui.QImage(
             image.data, w, h,
             bytes_per_line,
-            QtGui.QImage.Format_RGB888
-        ).scaled(self.width, self.height, QtCore.Qt.KeepAspectRatio)
+            QtGui.QImage.Format.Format_RGB888
+        ).scaled(self.width, self.height, QtCore.Qt.AspectRatioMode.KeepAspectRatio)
         self.setPixmap(QtGui.QPixmap.fromImage(q_image))
+
+        
