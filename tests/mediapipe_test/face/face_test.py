@@ -1,13 +1,21 @@
 import cv2
+import platform
+
 import mediapipe as mp
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
 mp_face_mesh = mp.solutions.face_mesh
-
 # For webcam input:
 drawing_spec = mp_drawing.DrawingSpec(thickness=1, circle_radius=1)
 
-cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+SYSTEM_NAME = platform.system()
+if SYSTEM_NAME == "Windows" :
+    VID_CAP_FLAG = cv2.CAP_DSHOW
+if SYSTEM_NAME == "Darwin" :
+    VID_CAP_FLAG = None
+
+
+cap = cv2.VideoCapture(1, VID_CAP_FLAG)
 with mp_face_mesh.FaceMesh(
     max_num_faces=1,
     refine_landmarks=True,
