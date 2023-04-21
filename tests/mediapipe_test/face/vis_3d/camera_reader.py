@@ -1,4 +1,5 @@
 import cv2
+import platform
 import numpy as np
 import multiprocessing
 from multiprocessing import shared_memory
@@ -31,7 +32,14 @@ class CameraReader(multiprocessing.Process) :
             (self.img_queue_size, self.frame_height, self.frame_width, 3),
             dtype=np.uint8, buffer = shm.buf
         )
-        cap = cv2.VideoCapture(self.camera_idx, cv2.CAP_DSHOW)
+
+        SYSTEM_NAME = platform.system()
+        if SYSTEM_NAME == "Windows" :
+            VID_CAP_FLAG = cv2.CAP_DSHOW
+        if SYSTEM_NAME == "Darwin" :
+            VID_CAP_FLAG = None
+
+        cap = cv2.VideoCapture(self.camera_idx, VID_CAP_FLAG)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
 

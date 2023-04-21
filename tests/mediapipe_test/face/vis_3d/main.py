@@ -1,5 +1,5 @@
 import sys
-import sys
+import platform
 import numpy as np
 import cv2
 import multiprocessing
@@ -30,6 +30,12 @@ class DataBridge(QtCore.QThread) :
             )
 
 if __name__ == "__main__" :
+    SYSTEM_NAME = platform.system()
+    if SYSTEM_NAME == "Windows" :
+        VID_CAP_FLAG = cv2.CAP_DSHOW
+    if SYSTEM_NAME == "Darwin" :
+        VID_CAP_FLAG = None
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--camera_idx",       default=0, type=int)
     parser.add_argument("--image_queue_size", default=5, type=int)
@@ -40,7 +46,7 @@ if __name__ == "__main__" :
 
     # open webcam first and get image size.
     # image shape should be square
-    cap = cv2.VideoCapture(args.camera_idx, cv2.CAP_DSHOW)
+    cap = cv2.VideoCapture(args.camera_idx, VID_CAP_FLAG)
     cap.set(cv2.CAP_PROP_FRAME_WIDTH,  args.image_width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, args.image_height)
     frame_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
