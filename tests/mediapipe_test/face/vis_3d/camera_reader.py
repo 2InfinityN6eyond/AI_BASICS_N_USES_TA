@@ -53,6 +53,9 @@ class CameraReader(multiprocessing.Process) :
         while not self.stop_flag.is_set() and cap.isOpened() :
             image_idx = next(image_idx_iterator)
             success_flag, frame = cap.read()
+
+            #print(frame.shape, frame_width, frame_height)
+
             image_queue[image_idx][:,:,:] = frame[:,:,:]
             #image_queue[image_idx][:,:,:] = frame[:,::-1,:]
             self.img_idx_queue.put(image_idx)   
