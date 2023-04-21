@@ -15,7 +15,7 @@ class FaceReader(multiprocessing.Process) :
         self.show = show
 
     def run(self) :
-        cap = cv2.VideoCapture(0)
+        cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1440)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1440)
 

@@ -4,7 +4,7 @@ mp_face_detection = mp.solutions.face_detection
 mp_drawing = mp.solutions.drawing_utils
 
 # For webcam input:
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
 with mp_face_detection.FaceDetection(
     model_selection=0,
     min_detection_confidence=0.5
