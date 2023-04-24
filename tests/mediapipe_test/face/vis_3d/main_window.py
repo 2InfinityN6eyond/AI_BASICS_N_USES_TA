@@ -55,7 +55,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.right_eye_plotter = ImagePlotter(250, 180)
         self.right_eye_vis_plotter = ImagePlotter(250, 180)
 
-        '''
+        
         self.webcam_image_plotter.update(
             np.zeros((500, 500, 3), dtype=np.uint8) + 150
         )
@@ -77,7 +77,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.right_eye_vis_plotter.update(
             np.zeros((250, 200, 3), dtype=np.uint8) + 150
         )
-        '''
+        
 
         eye_plot_layout = QtWidgets.QGridLayout()
         eye_plot_layout.addWidget(self.left_eye_plotter, 1, 1)
@@ -116,8 +116,8 @@ class MainWindow(QtWidgets.QMainWindow):
         face_landmarks_array  = face_landmark_dict["face"]
 
         print(image_queue_idx)
-        image = self.image_queue[image_queue_idx]
-        print(image[0][0])
+        image = self.image_queue[image_queue_idx].copy()
+        #print(image[0][0])
 
         return
 

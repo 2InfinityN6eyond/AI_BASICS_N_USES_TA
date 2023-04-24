@@ -43,7 +43,8 @@ if __name__ == "__main__" :
         VID_CAP_FLAG = cv2.CAP_DSHOW
     if SYSTEM_NAME == "Darwin" :
         VID_CAP_FLAG = None
-        camera_idx = 1
+
+    print(camera_idx)
 
     # open webcam first and get image size.
     # image shape should be square
@@ -72,7 +73,7 @@ if __name__ == "__main__" :
         shm_name        = shm_name,
         img_queue_size  = args.image_queue_size,
     )
-
+    main_window.show()
 
     # flag for stop program. chile processes stop if stop_flag set.
     stop_flag = multiprocessing.Event()
