@@ -32,7 +32,7 @@ class MainWindow(QtWidgets.QMainWindow):
         shm = shared_memory.SharedMemory(name=self.shm_name)
         self.image_queue = np.ndarray(
             (self.img_queue_size, self.frame_height, self.frame_width, 3),
-            dtype = np.uint8, buffer = shm.buf
+            dtype=np.uint8, buffer = shm.buf
         )
 
         self.initUI()
@@ -115,8 +115,15 @@ class MainWindow(QtWidgets.QMainWindow):
         image_queue_idx = face_landmark_dict["image_idx"]
         face_landmarks_array  = face_landmark_dict["face"]
 
+        print(image_queue_idx)
+        image = self.image_queue[image_queue_idx]
+        print(image[0][0])
+
+        return
+
         image = self.image_queue[image_queue_idx]
         image = image.copy()
+
 
         if face_landmarks_array is None : 
             return
@@ -150,7 +157,7 @@ class MainWindow(QtWidgets.QMainWindow):
         right_eye_lt_rb = right_eye_lt_rb.flatten().astype(int)
 
 
-        print(image.shape)
+        #print(image.shape)
         #self.webcam_image_plotter.update(image)
         '''
         self.face_plotter.update(image[

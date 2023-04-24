@@ -32,7 +32,7 @@ class DataBridge(QtCore.QThread) :
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
     parser.add_argument("--camera_idx",       default=0, type=int)
-    parser.add_argument("--image_queue_size", default=5, type=int)
+    parser.add_argument("--image_queue_size", default=10, type=int)
     parser.add_argument("--image_width",      default=1552, type=int)
     parser.add_argument("--image_height",     default=1552, type=int)
     args = parser.parse_args()
