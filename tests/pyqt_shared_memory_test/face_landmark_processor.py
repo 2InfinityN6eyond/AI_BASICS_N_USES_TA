@@ -32,11 +32,17 @@ class FaceLandmarkProcessor(multiprocessing.Process) :
         self.max_num_faces  = max_num_faces
 
     def run(self) :
+        #self.cap = cv2.VideoCapture(0)
+        #self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.frame_width)
+        #self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.frame_height)
+        
         shm = shared_memory.SharedMemory(name=self.shm_name)
         image_queue = np.ndarray(
             (self.img_queue_size, self.frame_height, self.frame_width, 3),
             dtype=np.uint8, buffer = shm.buf
         )
+
+        image_idx_iterator = iter(self.idx_iterator())
         with mp_face_mesh.FaceMesh(
             max_num_faces            = self.max_num_faces,
             refine_landmarks         = True,
@@ -44,9 +50,14 @@ class FaceLandmarkProcessor(multiprocessing.Process) :
             min_tracking_confidence  = 0.5
         ) as face_mesh :
             while not self.stop_flag.is_set() :
+
                 image_idx = self.img_idx_queue.get()
-                image = image_queue[image_idx].copy()
-                results = face_mesh.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+                results = face_mesh.process(
+                    cv2.cvtColor(
+                        image_queue[image_idx],
+                        cv2.COLOR_BGR2RGB
+                    )
+                )
                 data_dict = {"image_idx": image_idx, "face": None}
                 if results.multi_face_landmarks :
                     face_landmark_array = np.array(list(map(
@@ -56,3 +67,10 @@ class FaceLandmarkProcessor(multiprocessing.Process) :
                     data_dict["face"] = face_landmark_array
                 self.data_queue.put(data_dict)
             shm.close()
+
+    def idx_iterator(self) :
+            idx = 0
+            while True :
+                yield idx
+                idx += 1
+                idx %= self.img_queue_size

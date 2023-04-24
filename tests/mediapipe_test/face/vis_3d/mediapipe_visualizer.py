@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import mediapipe as mp
+import cv2
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 import pyqtgraph as pg
@@ -105,16 +106,44 @@ LEFT_PATH = edge_list_2_path( np.array(list(mp_face_mesh.FACEMESH_LEFT_IRIS)).to
 RIGHT_PATH = edge_list_2_path( np.array(list(mp_face_mesh.FACEMESH_RIGHT_IRIS)).tolist() )[0]
 '''
 
+
 class TwoDimensionVisualizer() :
-    def __init__(self) :
+    def __init__(
+        self
+    ) :
         pass
 
     def visualizeFace2D(
+        self,
         image,
         landmark_array
     ) :
+        landmark_2d_array = landmark_array[:, :2].copy()
+        landmark_2d_array *= np.array([
+            image.shape[1], image.shape[0]
+        ])
+        landmark_2d_array = landmark_2d_array.astype(int)
         
-        pass
+        list(map(
+            #lambda idx_list : print(landmark_2d_array[idx_list]),
+            lambda idx_list : cv2.polylines(
+                image,
+                [landmark_2d_array[idx_list]],
+                isClosed=False,
+                color=(255,255,255, 10),
+                thickness=2
+            ),
+            FACE_TESSELATION_PATH_LIST + 
+            FACE_LIPS_PATH_LIST + 
+            FACE_OVAL_PATH_LIST + 
+            FACE_LEFT_EYEBROW_PATH_LIST +
+            FACE_LEFT_EYE_PATH_LIST +
+            FACE_LEFT_IRIS_PATH_LIST +
+            FACE_RIGHT_EYEBROW_PATH_LIST + 
+            FACE_RIGHT_EYE_PATH_LIST +
+            FACE_RIGHT_IRIS_PATH_LIST
+        ))
+        return image
 
 class ThreeDimensionVisualizer(gl.GLViewWidget) :
     def __init__(self) -> None :

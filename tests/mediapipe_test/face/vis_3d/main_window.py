@@ -13,7 +13,7 @@ import mediapipe as mp
 mp_face_mesh = mp.solutions.face_mesh
 
 from image_plotter import ImagePlotter
-from mediapipe_visualizer import ThreeDimensionVisualizer
+from mediapipe_visualizer import ThreeDimensionVisualizer, TwoDimensionVisualizer
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(
@@ -29,12 +29,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.shm_name       = shm_name
         self.img_queue_size = img_queue_size
 
-        shm = shared_memory.SharedMemory(name=self.shm_name)
+        self.shm = shared_memory.SharedMemory(
+            name=self.shm_name,
+            size = (
+                self.img_queue_size * self.frame_height * self.frame_width * 3
+            )
+        )
         self.image_queue = np.ndarray(
             (self.img_queue_size, self.frame_height, self.frame_width, 3),
-            dtype=np.uint8, buffer = shm.buf
+            dtype=np.uint8, buffer = self.shm.buf
         )
-
+        
+        self.two_dimension_visualizer = TwoDimensionVisualizer()
         self.initUI()
 
     def initUI(self) :
@@ -51,10 +57,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.face_plotter = ImagePlotter(250, 250)
         self.face_vis_plotter = ImagePlotter(250, 250)
         self.left_eye_plotter = ImagePlotter(250, 180)
-        self.left_eye_vis_plotter = ImagePlotter(250, 180)
+        self.left_eye_vis_plotter = ImagePlotter(250, 100)
         self.right_eye_plotter = ImagePlotter(250, 180)
-        self.right_eye_vis_plotter = ImagePlotter(250, 180)
-
+        self.right_eye_vis_plotter = ImagePlotter(250, 100)
         
         self.webcam_image_plotter.update(
             np.zeros((500, 500, 3), dtype=np.uint8) + 150
@@ -66,16 +71,16 @@ class MainWindow(QtWidgets.QMainWindow):
             np.zeros((250, 250, 3), dtype=np.uint8) + 150
         )
         self.left_eye_plotter.update(
-            np.zeros((250, 180, 3), dtype=np.uint8) + 150
+            np.zeros((250, 100, 3), dtype=np.uint8) + 150
         )
         self.left_eye_vis_plotter.update(
-            np.zeros((250, 180, 3), dtype=np.uint8) + 150
+            np.zeros((250, 100, 3), dtype=np.uint8) + 150
         )
         self.right_eye_plotter.update(
-            np.zeros((250, 180, 3), dtype=np.uint8) + 150
+            np.zeros((250, 100, 3), dtype=np.uint8) + 150
         )
         self.right_eye_vis_plotter.update(
-            np.zeros((250, 200, 3), dtype=np.uint8) + 150
+            np.zeros((250, 100, 3), dtype=np.uint8) + 150
         )
         
 
@@ -95,11 +100,8 @@ class MainWindow(QtWidgets.QMainWindow):
         image_plot_layout.addLayout(eye_plot_layout)
 
         main_layout = QtWidgets.QHBoxLayout()
-
         main_layout.addWidget(self.three_dimention_visualizer)
-
         main_layout.addLayout(image_plot_layout)
-
 
         central_widget = QtWidgets.QWidget()
         central_widget.setLayout(main_layout)
@@ -111,22 +113,19 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         update three dimension plot, image plotters.
         """
-        self.three_dimention_visualizer.updateWhole(face_landmark_dict)
-        image_queue_idx = face_landmark_dict["image_idx"]
         face_landmarks_array  = face_landmark_dict["face"]
-
-        print(image_queue_idx)
-        image = self.image_queue[image_queue_idx].copy()
-        #print(image[0][0])
-
-        return
-
-        image = self.image_queue[image_queue_idx]
-        image = image.copy()
-
-
         if face_landmarks_array is None : 
             return
+
+        self.three_dimention_visualizer.updateWhole(face_landmark_dict)
+        image_queue_idx = face_landmark_dict["image_idx"]
+
+        image = self.image_queue[image_queue_idx].copy()
+        vis_image = image.copy()
+
+        vis_image = self.two_dimension_visualizer.visualizeFace2D(
+            image = vis_image, landmark_array = face_landmarks_array
+        )
 
         full_lt_rb = np.array([
             face_landmarks_array.min(axis=0),
@@ -156,10 +155,29 @@ class MainWindow(QtWidgets.QMainWindow):
         right_eye_lt_rb = right_eye_lt_rb * 2 - right_eye_lt_rb.mean(axis=0)
         right_eye_lt_rb = right_eye_lt_rb.flatten().astype(int)
 
+        image_shape = np.array(image.shape[-2:-4:-1])
+        left_iris_center = (face_landmarks_array[
+            np.array(list(mp_face_mesh.FACEMESH_LEFT_IRIS)).flatten()
+        ].mean(axis=0)[:2] * image_shape).astype(int)
+        right_iris_center = (face_landmarks_array[
+            np.array(list(mp_face_mesh.FACEMESH_RIGHT_IRIS)).flatten()
+        ].mean(axis=0)[:2] * image_shape).astype(int)
 
-        #print(image.shape)
-        #self.webcam_image_plotter.update(image)
-        '''
+        image = cv2.circle(
+            image,
+            left_iris_center,
+            2,
+            (255,255,255)
+        )
+        image = cv2.circle(
+            image,
+            right_iris_center,
+            2,
+            (255,255,255)
+        )
+
+        self.webcam_image_plotter.update(image)
+
         self.face_plotter.update(image[
             full_lt_rb[1]:full_lt_rb[3], full_lt_rb[0]:full_lt_rb[2], :
         ])
@@ -172,13 +190,24 @@ class MainWindow(QtWidgets.QMainWindow):
             left_eye_lt_rb[0]:left_eye_lt_rb[2],
             :
         ])
+        self.left_eye_vis_plotter.update(vis_image[
+            right_eye_lt_rb[1]:right_eye_lt_rb[3],
+            right_eye_lt_rb[0]:right_eye_lt_rb[2],
+            :
+        ])
 
         self.right_eye_plotter.update(image[
             right_eye_lt_rb[1]:right_eye_lt_rb[3],
             right_eye_lt_rb[0]:right_eye_lt_rb[2],
             :
         ])
-        '''
+        self.right_eye_vis_plotter.update(vis_image[
+            right_eye_lt_rb[1]:right_eye_lt_rb[3],
+            right_eye_lt_rb[0]:right_eye_lt_rb[2],
+            :
+        ])
+
+
 
     def saveData(self) :
         if self.record_curr_frame_button.isChecked() :
