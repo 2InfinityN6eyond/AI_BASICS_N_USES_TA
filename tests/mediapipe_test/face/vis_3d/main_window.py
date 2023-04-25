@@ -15,22 +15,36 @@ mp_face_mesh = mp.solutions.face_mesh
 from image_plotter import ImagePlotter
 from mediapipe_visualizer import ThreeDimensionVisualizer, TwoDimensionVisualizer
 
+class Configs :
+    def __init__(self, screen_width, screen_height) :
+        self.screen_geometry = np.array([screen_width, screen_height])
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.mouse_pos_raw = [None, None]
+        self.mouse_pos = [None, None]
+        self.scroll_val = [None, None]
+        self.click_val = [None, None]
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(
         self,
+        screen_width    :int,
+        screen_height   :int,
         frame_width     :int,
         frame_height    :int,
         shm_name        :str,
         img_queue_size  :int,
-    ):
+    ) :
         super(MainWindow, self).__init__()
         self.frame_width    = frame_width
         self.frame_height   = frame_height
-        self.shm_name       = shm_name
         self.img_queue_size = img_queue_size
 
+        self.configs = Configs(screen_width, screen_height)
+        self.configs.screen_width, self.configs.screen_height
+
         self.shm = shared_memory.SharedMemory(
-            name=self.shm_name,
+            name = shm_name,
             size = (
                 self.img_queue_size * self.frame_height * self.frame_width * 3
             )
@@ -40,26 +54,25 @@ class MainWindow(QtWidgets.QMainWindow):
             dtype=np.uint8, buffer = self.shm.buf
         )
         
-        self.two_dimension_visualizer = TwoDimensionVisualizer()
+        self.setMouseTracking(True)
         self.initUI()
 
     def initUI(self) :
+        self.two_dimension_visualizer = TwoDimensionVisualizer()
+
         self.three_dimention_visualizer = ThreeDimensionVisualizer()
         self.three_dimention_visualizer.setMinimumSize(500, 500)
         self.record_curr_frame_button = QtWidgets.QPushButton(
             "record_curr_frame", self
         )
-        self.record_curr_frame_button.setCheckable(True)
-        self.record_curr_frame_button.setChecked(False)
-        self.record_curr_frame_button.setShortcut("Ctrl+S")
 
         self.webcam_image_plotter = ImagePlotter(500, 500)
         self.face_plotter = ImagePlotter(250, 250)
         self.face_vis_plotter = ImagePlotter(250, 250)
-        self.left_eye_plotter = ImagePlotter(250, 180)
-        self.left_eye_vis_plotter = ImagePlotter(250, 100)
-        self.right_eye_plotter = ImagePlotter(250, 180)
-        self.right_eye_vis_plotter = ImagePlotter(250, 100)
+        self.left_eye_plotter = ImagePlotter(250, 200)
+        self.left_eye_vis_plotter = ImagePlotter(250, 200)
+        self.right_eye_plotter = ImagePlotter(250, 200)
+        self.right_eye_vis_plotter = ImagePlotter(250, 200)
         
         self.webcam_image_plotter.update(
             np.zeros((500, 500, 3), dtype=np.uint8) + 150
@@ -82,7 +95,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.right_eye_vis_plotter.update(
             np.zeros((250, 100, 3), dtype=np.uint8) + 150
         )
-        
 
         eye_plot_layout = QtWidgets.QGridLayout()
         eye_plot_layout.addWidget(self.left_eye_plotter, 1, 1)
@@ -94,7 +106,22 @@ class MainWindow(QtWidgets.QMainWindow):
         face_plot_layout.addWidget(self.face_plotter)
         face_plot_layout.addWidget(self.face_vis_plotter)
 
+        self.record_curr_frame_button.setCheckable(True)
+        self.record_curr_frame_button.setChecked(False)
+        self.record_curr_frame_button.setShortcut("Ctrl+S")
+        
+        self.record_state_label = QtWidgets.QLabel()
+        self.mouse_pos_raw_label = QtWidgets.QLabel()
+        self.mouse_pos_label = QtWidgets.QLabel()
+        
+        button_N_label_layout = QtWidgets.QHBoxLayout()
+        button_N_label_layout.addWidget(self.record_curr_frame_button)
+        button_N_label_layout.addWidget(self.record_state_label)
+        button_N_label_layout.addWidget(self.mouse_pos_raw_label)
+        button_N_label_layout.addWidget(self.mouse_pos_label)
+
         image_plot_layout = QtWidgets.QVBoxLayout()
+        image_plot_layout.addLayout(button_N_label_layout)
         image_plot_layout.addWidget(self.webcam_image_plotter)
         image_plot_layout.addLayout(face_plot_layout)
         image_plot_layout.addLayout(eye_plot_layout)
@@ -102,25 +129,35 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout = QtWidgets.QHBoxLayout()
         main_layout.addWidget(self.three_dimention_visualizer)
         main_layout.addLayout(image_plot_layout)
-
-        central_widget = QtWidgets.QWidget()
+        
+        central_widget = QtWidgets.QLabel()
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
         self.show()
-        #self.showMaximized()
 
-    def updateWhole(self, face_landmark_dict) :
+    def updateMouseData(self, mouse_data) :
+        print(mouse_data)
+        self.configs.mouse_pos_raw = np.array(mouse_data[0:2])
+        self.configs.mouse_pos = self.configs.mouse_pos_raw / self.configs.screen_geometry
+
+        self.mouse_pos_raw_label.setText(str(self.configs.mouse_pos_raw))
+        self.mouse_pos_label.setText(str(self.configs.mouse_pos))
+
+    def updateFaceData(self, face_landmark_dict) :
         """
         update three dimension plot, image plotters.
         """
+
         face_landmarks_array  = face_landmark_dict["face"]
         if face_landmarks_array is None : 
             return
+        face_landmarks_array[:, 0] = 1 - face_landmarks_array[:, 0]
 
         self.three_dimention_visualizer.updateWhole(face_landmark_dict)
         image_queue_idx = face_landmark_dict["image_idx"]
 
         image = self.image_queue[image_queue_idx].copy()
+        image = cv2.flip(image, 1)
         vis_image = image.copy()
 
         vis_image = self.two_dimension_visualizer.visualizeFace2D(
@@ -177,14 +214,12 @@ class MainWindow(QtWidgets.QMainWindow):
         )
 
         self.webcam_image_plotter.update(image)
-
         self.face_plotter.update(image[
             full_lt_rb[1]:full_lt_rb[3], full_lt_rb[0]:full_lt_rb[2], :
         ])
         self.face_vis_plotter.update(vis_image[
             full_lt_rb[1]:full_lt_rb[3], full_lt_rb[0]:full_lt_rb[2], :
         ])
-
         self.left_eye_plotter.update(image[
             left_eye_lt_rb[1]:left_eye_lt_rb[3],
             left_eye_lt_rb[0]:left_eye_lt_rb[2],
@@ -195,7 +230,6 @@ class MainWindow(QtWidgets.QMainWindow):
             right_eye_lt_rb[0]:right_eye_lt_rb[2],
             :
         ])
-
         self.right_eye_plotter.update(image[
             right_eye_lt_rb[1]:right_eye_lt_rb[3],
             right_eye_lt_rb[0]:right_eye_lt_rb[2],
@@ -206,8 +240,6 @@ class MainWindow(QtWidgets.QMainWindow):
             right_eye_lt_rb[0]:right_eye_lt_rb[2],
             :
         ])
-
-
 
     def saveData(self) :
         if self.record_curr_frame_button.isChecked() :
@@ -229,8 +261,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def keyReleaseEvent(self, a0: QtGui.QKeyEvent) -> None:
         if a0.key() == QtCore.Qt.Key.Key_Space and not a0.isAutoRepeat() :
             self.record_curr_frame_button.setChecked(False)
-
-        
+    
 if __name__ == "__main__" :
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()

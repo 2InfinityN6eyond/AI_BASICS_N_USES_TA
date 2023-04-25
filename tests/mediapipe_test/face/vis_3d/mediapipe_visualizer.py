@@ -60,18 +60,7 @@ def edge_list_2_path(edge_list) :
             if inner_changed :
                 break
     return tesel
-'''
-edge_list = np.array(
-    list(mp_face_mesh.FACEMESH_TESSELATION) +
-    list(mp_face_mesh.FACEMESH_FACE_OVAL) +
-    list(mp_face_mesh.FACEMESH_LIPS) +
-    list(mp_face_mesh.FACEMESH_IRISES) +
-    list(mp_face_mesh.FACEMESH_LEFT_EYE) +
-    list(mp_face_mesh.FACEMESH_RIGHT_EYE) +
-    list(mp_face_mesh.FACEMESH_LEFT_EYEBROW) +
-    list(mp_face_mesh.FACEMESH_RIGHT_EYEBROW)
-).tolist()
-'''
+
 
 FACE_TESSELATION_PATH_LIST = edge_list_2_path(np.array(list(
     mp_face_mesh.FACEMESH_TESSELATION
@@ -100,12 +89,6 @@ FACE_RIGHT_EYE_PATH_LIST = edge_list_2_path(np.array(list(
 FACE_RIGHT_IRIS_PATH_LIST = edge_list_2_path(np.array(list(
     mp_face_mesh.FACEMESH_RIGHT_IRIS
 )).tolist())
-'''
-FACE_PATH_LIST = edge_list_2_path(edge_list)
-LEFT_PATH = edge_list_2_path( np.array(list(mp_face_mesh.FACEMESH_LEFT_IRIS)).tolist() )[0]
-RIGHT_PATH = edge_list_2_path( np.array(list(mp_face_mesh.FACEMESH_RIGHT_IRIS)).tolist() )[0]
-'''
-
 
 class TwoDimensionVisualizer() :
     def __init__(
@@ -131,9 +114,19 @@ class TwoDimensionVisualizer() :
                 [landmark_2d_array[idx_list]],
                 isClosed=False,
                 color=(255,255,255, 10),
+                thickness=1
+            ),
+            FACE_TESSELATION_PATH_LIST
+        ))
+        list(map(
+            #lambda idx_list : print(landmark_2d_array[idx_list]),
+            lambda idx_list : cv2.polylines(
+                image,
+                [landmark_2d_array[idx_list]],
+                isClosed=False,
+                color=(255,255,255, 10),
                 thickness=2
             ),
-            FACE_TESSELATION_PATH_LIST + 
             FACE_LIPS_PATH_LIST + 
             FACE_OVAL_PATH_LIST + 
             FACE_LEFT_EYEBROW_PATH_LIST +
@@ -151,14 +144,11 @@ class ThreeDimensionVisualizer(gl.GLViewWidget) :
 
         gx = gl.GLGridItem(color=pg.mkColor((100, 50, 50)))
         gx.rotate(90, 0, 1, 0)
-        #gx.translate(-1.5, 0, 0)
         self.addItem(gx)
         gy = gl.GLGridItem(color=pg.mkColor((50, 100, 50)))
         gy.rotate(90, 1, 0, 0)
-        #gy.translate(0, -1.5, 0)
         self.addItem(gy)
         gz = gl.GLGridItem(color=pg.mkColor((50, 50, 100)))
-        #gz.translate(0, 0, -1.5)
         self.addItem(gz)
 
         self.setCameraParams(elevation = -90, azimuth = -90)
@@ -184,7 +174,7 @@ class ThreeDimensionVisualizer(gl.GLViewWidget) :
                 color = pg.mkColor((255, 0, 0)), width = 2,
                 antialias = True
             ),            
-            #FACE_TESSELATION_PATH_LIST + 
+            FACE_TESSELATION_PATH_LIST + 
             FACE_LIPS_PATH_LIST + 
             FACE_OVAL_PATH_LIST + 
             FACE_LEFT_EYEBROW_PATH_LIST +

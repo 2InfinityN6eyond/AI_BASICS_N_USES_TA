@@ -6,6 +6,8 @@ import multiprocessing
 from multiprocessing import shared_memory
 import argparse
 
+from pynput import mouse
+
 from PyQt6 import QtWidgets, QtCore, QtGui
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
@@ -17,17 +19,36 @@ from main_window import MainWindow
 
 class DataBridge(QtCore.QThread) :
     landmark_acquired = QtCore.pyqtSignal(dict)
-
+    mouse_changed = QtCore.pyqtSignal(list)
+    
     def __init__(self, stop_flag, data_queue) :
         super(DataBridge, self).__init__()
         self.stop_flag = stop_flag
         self.data_queue = data_queue
 
     def run(self) :
+        listener = mouse.Listener(
+            on_move = lambda x, y : self.mouse_changed.emit(
+                [int(x), int(y), None, None, None, None]
+            ),
+            on_click = lambda x, y, button, pressed : self.mouse_changed.emit(
+                [int(x), int(y), None, None, button, pressed]
+            ),
+            on_scroll = lambda x, y, dx, dy : self.mouse_changed.emit(
+                [int(x), int(y), int(dx), int(dy), None, None]
+            )
+        )
+        listener.start()
+
         while not self.stop_flag.is_set() :
             self.landmark_acquired.emit(
                 self.data_queue.get()
             )
+        
+        listener.stop()
+        listener.join()
+
+
 
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
@@ -67,7 +88,10 @@ if __name__ == "__main__" :
 
     # initialize pyqt app
     app = QtWidgets.QApplication(sys.argv)
+    screen_geometry = app.primaryScreen().geometry()
     main_window = MainWindow(
+        screen_width    = screen_geometry.width(),
+        screen_height   = screen_geometry.height(),
         frame_width     = frame_width,
         frame_height    = frame_height,
         shm_name        = shm_name,
@@ -106,8 +130,10 @@ if __name__ == "__main__" :
     )
     
     data_bridge.landmark_acquired.connect(
-        #lambda landmark_dict : main_window.three_dimention_visualizer.updateWhole(landmark_dict)
-        lambda ladmark_dict : main_window.updateWhole(ladmark_dict)
+        lambda ladmark_dict : main_window.updateFaceData(ladmark_dict)
+    )
+    data_bridge.mouse_changed.connect(
+        lambda mouse_data : main_window.updateMouseData(mouse_data)
     )
 
     data_bridge.start()
