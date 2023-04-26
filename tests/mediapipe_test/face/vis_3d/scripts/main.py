@@ -3,6 +3,7 @@ import sys
 import platform
 import numpy as np
 import cv2
+import time
 import multiprocessing
 from multiprocessing import shared_memory
 import argparse
@@ -171,6 +172,7 @@ if __name__ == "__main__" :
 
     print("face_landmark_joined")
 
+    time.sleep(3)
     data_writer.join()
 
     print("data_writer joined")

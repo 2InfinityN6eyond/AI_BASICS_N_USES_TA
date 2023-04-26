@@ -275,6 +275,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ])
 
         if self.record_curr_frame_button.isChecked() :
+            print(f"<<putting. idx:{shm_queue_idx}")
             self.save_data_queue.put({
                 "shm_queue_idx" : shm_queue_idx,
                 "mouse_position" : self.configs.mouse_pos

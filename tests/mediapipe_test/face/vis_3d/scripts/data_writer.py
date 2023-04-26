@@ -52,29 +52,29 @@ class DataWriterWorder(threading.Thread) :
         face_array = face_queue[self.shm_queue_idx]
 
         while not self.stop_flag.is_set() :
-            if not self.data_queue.empty() :
-                data = self.data_queue.get()
-                mouse_position = data["mouse_position"]
+            #if not self.data_queue.empty() :
+            data = self.data_queue.get()
+            mouse_position = data["mouse_position"]
 
-                image = image_array.copy()
-                image = cv2.flip(image, 1)
-                face_landmark_array = face_array.copy()
-                face_landmark_array[:, 0] = 1 - face_landmark_array[:, 0]
+            image = image_array.copy()
+            image = cv2.flip(image, 1)
+            face_landmark_array = face_array.copy()
+            face_landmark_array[:, 0] = 1 - face_landmark_array[:, 0]
 
-                timestamp = str(time.time()).replace('.', '_')
-                if self.save_image_flag :
-                    cv2.imwrite(
-                        os.path.join(self.save_dir_path, f"{timestamp}.png"),
-                        image
-                    )
-                with open(os.path.join(self.save_dir_path, f"{timestamp}.json"), "w") as fp :
-                    json.dump(
-                        {
-                            "mouse_position" : mouse_position.tolist(),
-                            "face_landmark_array" : face_landmark_array.tolist(),
-                        },
-                        fp, indent = 2
-                    )
+            timestamp = str(time.time()).replace('.', '_')
+            if self.save_image_flag :
+                cv2.imwrite(
+                    os.path.join(self.save_dir_path, f"{timestamp}.png"),
+                    image
+                )
+            with open(os.path.join(self.save_dir_path, f"{timestamp}.json"), "w") as fp :
+                json.dump(
+                    {
+                        "mouse_position" : mouse_position.tolist(),
+                        "face_landmark_array" : face_landmark_array.tolist(),
+                    },
+                    fp, indent = 2
+                )
             image_shm.close()
             face_shm.close()
 
@@ -89,8 +89,8 @@ class DataWriter(multiprocessing.Process) :
         shm_queue_size  : int,
         save_data_queue : multiprocessing.Queue,
         stop_flag       : multiprocessing.Event,
-        save_every_data_flag : bool = False,
-        save_image_flag : bool = True,
+        save_every_data_flag : bool = True,
+        save_image_flag : bool = False,
     ) :
         super(DataWriter, self).__init__()
         self.frame_width    = frame_width
@@ -133,15 +133,23 @@ class DataWriter(multiprocessing.Process) :
         ))
         list(map(lambda worker : worker.start(), self.data_writer_worker_list))
 
-        while not self.stop_flag.is_set() :
-            if not self.save_data_queue.empty() :
-                data = self.save_data_queue.get()
-                shm_idx = data["shm_queue_idx"]
-                if self.save_every_data_flag :
-                    self.data_writer_worker_queue_list[shm_idx].put(data)
-                elif shm_idx % self.shm_queue_size == 0 :
-                    self.data_writer_worker_queue_list[shm_idx].put(data)
+        #while not self.stop_flag.is_set() :
+        while True : 
+            #print(time.time())
+            #if not self.save_data_queue.empty() :
+            #    print("===")
+            data = self.save_data_queue.get()
+            #    print("ooo")
+            shm_idx = data["shm_queue_idx"]
+            print(f">>getting. idx:{shm_idx}")
 
+            continue
+            #if self.save_every_data_flag :
+            #    self.data_writer_worker_queue_list[shm_idx].put(data)
+            #elif shm_idx % self.shm_queue_size == 0 :
+            #    self.data_writer_worker_queue_list[shm_idx].put(data)
+            self.data_writer_worker_queue_list[shm_idx].put(data)
+            #print("<<<", time.time())
         print("joining workers..")
 
         self.join_workers()
