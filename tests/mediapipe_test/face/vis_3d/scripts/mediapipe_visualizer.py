@@ -160,13 +160,16 @@ class ThreeDimensionVisualizer(gl.GLViewWidget) :
 
     def updateFace(
         self,
-        landmark_list,
+        landmark_array,
+        set_mean_as_origin = True,
         always_place_center = False,
     ) :
+        landmark_array = landmark_array.copy()
         for line_item in self.face_line_list :
             self.removeItem(line_item)
-        landmark_array = np.array(landmark_list) - np.array([0.5, 0.5, 0])
-        if always_place_center :
+        if set_mean_as_origin :
+            landmark_array -= np.array([0.5, 0.5, 0])
+        elif always_place_center :
             landmark_array -= landmark_array.mean(axis=0)
         self.face_line_list = list(map(
             lambda face_path : gl.GLLinePlotItem(
@@ -187,8 +190,3 @@ class ThreeDimensionVisualizer(gl.GLViewWidget) :
         for item in self.face_line_list :
             if item :
                 self.addItem(item)
-
-    def updateWhole(self, landmark_dict) :
-        if landmark_dict["face"] is not None :
-            self.updateFace(landmark_dict["face"])
-

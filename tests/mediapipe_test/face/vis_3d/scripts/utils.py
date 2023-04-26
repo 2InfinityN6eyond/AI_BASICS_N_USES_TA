@@ -11,5 +11,6 @@ POSE_TRAJECTORY_PATH = []
 HAND_TRAJECTORY_PATH = []
 FACE_TRAJECTORY_PATH = []
 
-def mpHand2Array(results:mp.python.solytion_base.SolutionOutputs) :
-    pass
+
+
+N_FACE_LANDMARK_FEATURES = 478

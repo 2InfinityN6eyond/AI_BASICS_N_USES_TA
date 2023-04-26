@@ -10,7 +10,7 @@ class CameraReader(multiprocessing.Process) :
         camera_idx      :int,
         frame_width     :int,
         frame_height    :int,
-        shm_name        :str,
+        img_shm_name    :str,
         img_queue_size  :int,
         img_idx_queue   :multiprocessing.Queue, 
         stop_flag       :multiprocessing.Event
@@ -19,7 +19,7 @@ class CameraReader(multiprocessing.Process) :
         self.camera_idx      = camera_idx
         self.frame_width     = frame_width
         self.frame_height    = frame_height
-        self.shm_name        = shm_name
+        self.img_shm_name    = img_shm_name
         self.img_queue_size  = img_queue_size
         self.img_idx_queue   = img_idx_queue
         self.stop_flag       = stop_flag
@@ -27,7 +27,7 @@ class CameraReader(multiprocessing.Process) :
     def run(self) :
         image_idx_iterator = iter(self.idx_iterator())
 
-        shm = shared_memory.SharedMemory(name=self.shm_name)
+        shm = shared_memory.SharedMemory(name=self.img_shm_name)
         image_queue = np.ndarray(
             (self.img_queue_size, self.frame_height, self.frame_width, 3),
             dtype=np.uint8, buffer = shm.buf

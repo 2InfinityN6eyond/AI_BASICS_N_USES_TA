@@ -1,1 +1,7 @@
 *._*
+*data/
+*data/*
+*.jpg
+*.png
+*.json
+*.pkl

@@ -4,6 +4,7 @@ import cv2
 import sys 
 import numpy as np
 import multiprocessing
+import pickle
 from multiprocessing import shared_memory
 
 from PyQt6 import QtWidgets, QtCore, QtGui
@@ -14,44 +15,71 @@ mp_face_mesh = mp.solutions.face_mesh
 
 from image_plotter import ImagePlotter
 from mediapipe_visualizer import ThreeDimensionVisualizer, TwoDimensionVisualizer
+from utils import N_FACE_LANDMARK_FEATURES
 
 class Configs :
-    def __init__(self, screen_width, screen_height) :
-        self.screen_geometry = np.array([screen_width, screen_height])
+    def __init__(
+        self,
+        proj_root_dir,
+        screen_width, screen_height,
+        frame_width, frame_height,
+        img_shm_name,
+        face_shm_name,
+        shm_queue_size
+    ) :
+        self.PROJECT_ROOT_PATH = proj_root_dir
+        self.DATA_ROOT_PATH  = os.path.join(self.PROJECT_ROOT_PATH, "data")
         self.screen_width = screen_width
         self.screen_height = screen_height
+        self.screen_geometry = np.array([screen_width, screen_height])
+
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+        self.img_shm_name = img_shm_name
+        self.face_shm_name = face_shm_name
+        self.shm_queue_size = shm_queue_size
+
         self.mouse_pos_raw = [None, None]
         self.mouse_pos = [None, None]
         self.scroll_val = [None, None]
         self.click_val = [None, None]
 
+        self.DATA_DIR_PATH = None
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(
         self,
+        proj_root_dir   :str,
         screen_width    :int,
         screen_height   :int,
         frame_width     :int,
         frame_height    :int,
-        shm_name        :str,
-        img_queue_size  :int,
+        img_shm_name    :str,
+        face_shm_name   :str,
+        shm_queue_size  :int,
+        save_data_queue :multiprocessing.Queue
     ) :
         super(MainWindow, self).__init__()
-        self.frame_width    = frame_width
-        self.frame_height   = frame_height
-        self.img_queue_size = img_queue_size
-
-        self.configs = Configs(screen_width, screen_height)
-        self.configs.screen_width, self.configs.screen_height
-
-        self.shm = shared_memory.SharedMemory(
-            name = shm_name,
-            size = (
-                self.img_queue_size * self.frame_height * self.frame_width * 3
-            )
+        
+        self.configs = Configs(
+            proj_root_dir,
+            screen_width, screen_height,
+            frame_width, frame_height,
+            img_shm_name,
+            face_shm_name,
+            shm_queue_size
         )
+        self.save_data_queue = save_data_queue
+        self.image_shm = shared_memory.SharedMemory(name = img_shm_name)
         self.image_queue = np.ndarray(
-            (self.img_queue_size, self.frame_height, self.frame_width, 3),
-            dtype=np.uint8, buffer = self.shm.buf
+            (shm_queue_size, frame_height, frame_width, 3),
+            dtype=np.uint8, buffer = self.image_shm.buf
+        )
+
+        self.face_shm = shared_memory.SharedMemory(name = face_shm_name)
+        self.face_queue = np.ndarray(
+            (shm_queue_size, N_FACE_LANDMARK_FEATURES, 3),
+            dtype=np.float64, buffer = self.face_shm.buf
         )
         
         self.setMouseTracking(True)
@@ -136,45 +164,51 @@ class MainWindow(QtWidgets.QMainWindow):
         self.show()
 
     def updateMouseData(self, mouse_data) :
-        print(mouse_data)
         self.configs.mouse_pos_raw = np.array(mouse_data[0:2])
+        self.configs.scroll_val = np.array(mouse_data[2:4])
         self.configs.mouse_pos = self.configs.mouse_pos_raw / self.configs.screen_geometry
+        
 
         self.mouse_pos_raw_label.setText(str(self.configs.mouse_pos_raw))
         self.mouse_pos_label.setText(str(self.configs.mouse_pos))
 
-    def updateFaceData(self, face_landmark_dict) :
+    def updateFaceData(self, data_dict) :
         """
         update three dimension plot, image plotters.
         """
 
-        face_landmarks_array  = face_landmark_dict["face"]
-        if face_landmarks_array is None : 
-            return
-        face_landmarks_array[:, 0] = 1 - face_landmarks_array[:, 0]
-
-        self.three_dimention_visualizer.updateWhole(face_landmark_dict)
-        image_queue_idx = face_landmark_dict["image_idx"]
-
-        image = self.image_queue[image_queue_idx].copy()
+        shm_queue_idx = data_dict["image_idx"]
+        image = self.image_queue[shm_queue_idx].copy()
         image = cv2.flip(image, 1)
-        vis_image = image.copy()
+        self.webcam_image_plotter.update(image)
+        
+        if not data_dict["face_detected"] :
+            return
+        
+        face_landmark_array = self.face_queue[shm_queue_idx].copy()
+        face_landmark_array[:, 0] = 1 - face_landmark_array[:, 0]
+        
+        if face_landmark_array[:, :2].min() < 0 :
+            return
 
+        self.three_dimention_visualizer.updateFace(face_landmark_array)
+
+        vis_image = image.copy() 
         vis_image = self.two_dimension_visualizer.visualizeFace2D(
-            image = vis_image, landmark_array = face_landmarks_array
+            image = vis_image, landmark_array = face_landmark_array
         )
 
         full_lt_rb = np.array([
-            face_landmarks_array.min(axis=0),
-            face_landmarks_array.max(axis=0),
+            face_landmark_array.min(axis=0),
+            face_landmark_array.max(axis=0),
         ])[:, :2] * image.shape[-2:-4:-1]
         full_lt_rb = full_lt_rb.flatten().astype(int)
 
         left_eye_lt_rb = np.array([
-            face_landmarks_array[
+            face_landmark_array[
                 np.array(list(mp_face_mesh.FACEMESH_LEFT_EYE)).flatten()
             ].min(axis=0),
-            face_landmarks_array[
+            face_landmark_array[
                 np.array(list(mp_face_mesh.FACEMESH_LEFT_EYE)).flatten()
             ].max(axis=0),
         ])[:, :2] * image.shape[-2:-4:-1]
@@ -182,10 +216,10 @@ class MainWindow(QtWidgets.QMainWindow):
         left_eye_lt_rb = left_eye_lt_rb.flatten().astype(int)
 
         right_eye_lt_rb = np.array([
-            face_landmarks_array[
+            face_landmark_array[
                 np.array(list(mp_face_mesh.FACEMESH_RIGHT_EYE)).flatten()
             ].min(axis=0),
-            face_landmarks_array[
+            face_landmark_array[
                 np.array(list(mp_face_mesh.FACEMESH_RIGHT_EYE)).flatten()
             ].max(axis=0),
         ])[:, :2] * image.shape[-2:-4:-1]
@@ -193,10 +227,10 @@ class MainWindow(QtWidgets.QMainWindow):
         right_eye_lt_rb = right_eye_lt_rb.flatten().astype(int)
 
         image_shape = np.array(image.shape[-2:-4:-1])
-        left_iris_center = (face_landmarks_array[
+        left_iris_center = (face_landmark_array[
             np.array(list(mp_face_mesh.FACEMESH_LEFT_IRIS)).flatten()
         ].mean(axis=0)[:2] * image_shape).astype(int)
-        right_iris_center = (face_landmarks_array[
+        right_iris_center = (face_landmark_array[
             np.array(list(mp_face_mesh.FACEMESH_RIGHT_IRIS)).flatten()
         ].mean(axis=0)[:2] * image_shape).astype(int)
 
@@ -213,7 +247,6 @@ class MainWindow(QtWidgets.QMainWindow):
             (255,255,255)
         )
 
-        self.webcam_image_plotter.update(image)
         self.face_plotter.update(image[
             full_lt_rb[1]:full_lt_rb[3], full_lt_rb[0]:full_lt_rb[2], :
         ])
@@ -241,18 +274,38 @@ class MainWindow(QtWidgets.QMainWindow):
             :
         ])
 
-    def saveData(self) :
         if self.record_curr_frame_button.isChecked() :
-            if (
-                    self.configs_n_vals["pressure_sensor_data"] and \
-                    self.configs_n_vals["image_data"] # and \
-                    #self.configs_n_vals["homography"]
-            ) :
-                self.to_data_writer.put({
-                    "pressure_sensor" : self.configs_n_vals["pressure_sensor_data"],
-                    "images" : self.configs_n_vals["image_data"],
-                    "homography" : self.configs_n_vals["homography"]
-                })
+            self.save_data_queue.put({
+                "shm_queue_idx" : shm_queue_idx,
+                "mouse_position" : self.configs.mouse_pos
+            })
+
+    def saveData(
+        self,
+        image,
+        face_landmark_array,
+        mouse_pos
+    ) :
+        if not self.configs.DATA_DIR_PATH :
+            DATA_DIR_NAME = time.strftime("%Y_%m_%d__%H_%M_%S")
+            self.configs.DATA_DIR_PATH = os.path.join(self.configs.DATA_ROOT_PATH, DATA_DIR_NAME)
+            os.makedirs(self.configs.DATA_DIR_PATH)
+        
+        timestamp = str(int(time.time()))
+        cv2.imwrite(
+            os.path.join(self.configs.DATA_DIR_PATH, f"{timestamp}.png"),
+            image
+        )
+        with open(
+            os.path.join(self.configs.DATA_DIR_PATH, f"{timestamp}.pkl"), "wb"
+        ) as fp :
+            pickle.dump(
+                {
+                    "face_landmark_array" : face_landmark_array,
+                    "mouse_position" : mouse_pos
+                },
+                fp
+            )
 
     def keyPressEvent(self, a0: QtGui.QKeyEvent) -> None:
         if a0.key() == QtCore.Qt.Key.Key_Space :
@@ -261,7 +314,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def keyReleaseEvent(self, a0: QtGui.QKeyEvent) -> None:
         if a0.key() == QtCore.Qt.Key.Key_Space and not a0.isAutoRepeat() :
             self.record_curr_frame_button.setChecked(False)
-    
+
 if __name__ == "__main__" :
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
