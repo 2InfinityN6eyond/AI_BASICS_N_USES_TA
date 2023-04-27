@@ -69,7 +69,7 @@ class DataBridge(QtCore.QThread) :
 if __name__ == "__main__" :
     parser = argparse.ArgumentParser()
     parser.add_argument("--camera_idx",         default=0, type=int)
-    parser.add_argument("--image_queue_size",   default=10, type=int)
+    parser.add_argument("--image_queue_size",   default=4, type=int)
     parser.add_argument("--image_width",        default=1552, type=int)
     parser.add_argument("--image_height",       default=1552, type=int)
     args = parser.parse_args()
@@ -191,6 +191,7 @@ if __name__ == "__main__" :
 
     print("face_landmark_joined")
 
+    time.sleep(2)
     data_writer.join()
 
     print("data_writer joined")
