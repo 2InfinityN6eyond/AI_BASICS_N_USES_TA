@@ -21,6 +21,20 @@ from mediapipe_visualizer import ThreeDimensionVisualizer
 from main_window import MainWindow
 from data_writer import DataWriter
 
+
+class FakeWriter(multiprocessing.Process) :
+    def __init__(self, queue, stop_flag) :
+        super(FakeWriter, self).__init__()
+        self.queue = queue
+        self.stop_flag = stop_flag
+    
+    def run(self) :
+        while not self.stop_flag.is_set() :
+            if not self.queue.empty() :
+                data = self.queue.get()
+
+                print(data)
+
 class DataBridge(QtCore.QThread) :
     landmark_acquired = QtCore.pyqtSignal(dict)
     mouse_changed = QtCore.pyqtSignal(list)
@@ -137,6 +151,9 @@ if __name__ == "__main__" :
         data_queue      = data_queue,
         stop_flag       = stop_flag,
     )
+    '''
+    data_writer = FakeWriter(save_data_queue, stop_flag)
+    '''
     data_writer = DataWriter(
         frame_width     = frame_width,
         frame_height    = frame_height,
@@ -147,6 +164,8 @@ if __name__ == "__main__" :
         save_data_queue = save_data_queue,
         stop_flag       = stop_flag
     )
+    
+
     data_bridge = DataBridge(
         stop_flag = stop_flag,
         data_queue = data_queue
@@ -172,7 +191,6 @@ if __name__ == "__main__" :
 
     print("face_landmark_joined")
 
-    time.sleep(3)
     data_writer.join()
 
     print("data_writer joined")
